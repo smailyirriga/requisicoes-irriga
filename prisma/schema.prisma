@@ -1,0 +1,150 @@
+// Esquema do banco — App de Requisição de Compras (IRRIGA ENGENHARIA)
+// PostgreSQL (Supabase). DATABASE_URL = conexão "pooler" (porta 6543, pgbouncer);
+// DIRECT_URL = conexão direta (porta 5432) usada só para migrações.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+/// Papéis: SOLICITANTE | APROVADOR | SUPRIMENTOS | ADMIN
+model User {
+  id        String   @id @default(cuid())
+  nome      String
+  email     String   @unique
+  senhaHash String
+  papel     String   @default("SOLICITANTE")
+  ativo     Boolean  @default(true)
+  criadoEm  DateTime @default(now())
+
+  requisicoes    Requisicao[]   @relation("solicitante")
+  decisoes       Requisicao[]   @relation("decisor")
+  itensCriados   ItemCatalogo[] @relation("criadorItem")
+  eventos        RequisicaoEvento[]
+}
+
+model Obra {
+  id       String   @id @default(cuid())
+  nome     String   @unique
+  cidadeUf String?
+  codigo   String?
+  ativo    Boolean  @default(true)
+  criadoEm DateTime @default(now())
+
+  requisicoes Requisicao[]
+}
+
+model ItemCatalogo {
+  id           String   @id @default(cuid())
+  codigo       String?  // código IRRIGA ENG (ex.: "1770"); nulo enquanto "a cadastrar"
+  descricao    String
+  natureza     String?
+  unidade      String?
+  prazoEntrega String?
+  ativo        Boolean  @default(true)
+  pendente     Boolean  @default(false) // sugerido pelo solicitante, aguardando cadastro do código
+  criadoPorId  String?
+  criadoPor    User?    @relation("criadorItem", fields: [criadoPorId], references: [id])
+  criadoEm     DateTime @default(now())
+
+  itens RequisicaoItem[]
+
+  @@index([descricao])
+  @@index([natureza])
+}
+
+model Requisicao {
+  id              String    @id @default(cuid())
+  numero          Int
+  obraId          String
+  obra            Obra      @relation(fields: [obraId], references: [id])
+  solicitanteId   String
+  solicitante     User      @relation("solicitante", fields: [solicitanteId], references: [id])
+  data            DateTime  @default(now())
+  status          String    @default("RASCUNHO") // RASCUNHO|ENVIADA|APROVADA|RECUSADA|EM_COMPRA|RECEBIDA|CANCELADA
+  observacaoGeral String?
+  enviadaEm       DateTime?
+  decididaEm      DateTime?
+  decisorId       String?
+  decisor         User?     @relation("decisor", fields: [decisorId], references: [id])
+  notaDecisao     String?
+  criadoEm        DateTime  @default(now())
+  atualizadoEm    DateTime  @updatedAt
+
+  // Referência do rascunho criado offline no celular (evita duplicar ao sincronizar)
+  clienteRef String? @unique
+
+  itens     RequisicaoItem[]
+  historico RequisicaoEvento[]
+
+  @@unique([obraId, numero])
+  @@index([status])
+}
+
+model RequisicaoItem {
+  id             String    @id @default(cuid())
+  requisicaoId   String
+  requisicao     Requisicao @relation(fields: [requisicaoId], references: [id], onDelete: Cascade)
+  itemCatalogoId String?
+  itemCatalogo   ItemCatalogo? @relation(fields: [itemCatalogoId], references: [id])
+
+  finalidade    String
+  descricao     String
+  quantidade    Float
+  unidade       String?
+  dataDesejavel DateTime?
+  observacoes   String?
+  codigo        String?  // snapshot do código no momento da requisição (ou "CADASTRAR")
+  prazoEstimado String?
+  ordem         Int      @default(0)
+
+  // Preenchido por Suprimentos na fase de compra
+  valorUnitario Float?
+  fornecedor    String?
+  statusItem    String?  // PENDENTE|COMPRADO|RECEBIDO|CANCELADO
+
+  @@index([requisicaoId])
+}
+
+model RequisicaoEvento {
+  id           String   @id @default(cuid())
+  requisicaoId String
+  requisicao   Requisicao @relation(fields: [requisicaoId], references: [id], onDelete: Cascade)
+  tipo         String   // CRIADA|ENVIADA|APROVADA|RECUSADA|EM_COMPRA|RECEBIDA|CANCELADA|EDITADA|COMENTARIO
+  de           String?
+  para         String?
+  nota         String?
+  autorId      String?
+  autor        User?    @relation(fields: [autorId], references: [id])
+  autorNome    String?
+  criadoEm     DateTime @default(now())
+
+  @@index([requisicaoId])
+}
+
+/// Contador de numeração por obra (evita corrida ao gerar #NN)
+model Contador {
+  obraId String @id
+  ultimo Int    @default(0)
+}
+
+/// Sugestões/feedback dos usuários durante a validação do app
+model Feedback {
+  id        String   @id @default(cuid())
+  texto     String
+  pagina    String?
+  tipo      String   @default("SUGESTAO") // SUGESTAO | PROBLEMA | DUVIDA
+  autorId   String?
+  autorNome String?
+  papel     String?
+  resolvido Boolean  @default(false)
+  resposta  String?
+  criadoEm  DateTime @default(now())
+
+  @@index([resolvido])
+}
