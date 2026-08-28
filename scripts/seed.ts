@@ -11,7 +11,10 @@ import ExcelJS from "exceljs";
 import bcrypt from "bcryptjs";
 import { PrismaClient } from "@prisma/client";
 
-const prisma = new PrismaClient();
+// Usa a conexão direta (porta 5432) — melhor para inserção em massa que o pooler 6543.
+const prisma = new PrismaClient(
+  process.env.DIRECT_URL ? { datasourceUrl: process.env.DIRECT_URL } : {},
+);
 const RAIZ = process.cwd();
 const CADASTRAR = "CADASTRAR";
 
@@ -131,24 +134,39 @@ async function main() {
       });
     });
 
-    for (const l of linhas) {
-      const jaTem = l.codigo && catalogoPorCodigo.has(l.codigo);
-      if (jaTem) continue;
-      const item = await prisma.itemCatalogo.create({
-        data: {
-          codigo: l.codigo,
-          descricao: l.descricao,
-          natureza: l.natureza,
-          unidade: l.unidade,
-          prazoEntrega: l.prazo,
-          pendente: l.codigo == null,
-          ativo: true,
-        },
-      });
-      if (l.codigo) catalogoPorCodigo.set(l.codigo, item.id);
-      if (l.codigo) nCat++;
-      else nPend++;
+    // dedup por código (mantém o primeiro)
+    const vistos = new Set<string>();
+    const aInserir = linhas.filter((l) => {
+      if (l.codigo) {
+        if (vistos.has(l.codigo)) return false;
+        vistos.add(l.codigo);
+        nCat++;
+      } else {
+        nPend++;
+      }
+      return true;
+    });
+
+    const LOTE = 500;
+    for (let i = 0; i < aInserir.length; i += LOTE) {
+      const lote = aInserir.slice(i, i + LOTE).map((l) => ({
+        codigo: l.codigo,
+        descricao: l.descricao,
+        natureza: l.natureza,
+        unidade: l.unidade,
+        prazoEntrega: l.prazo,
+        pendente: l.codigo == null,
+        ativo: true,
+      }));
+      await prisma.itemCatalogo.createMany({ data: lote });
+      console.log(`  ...${Math.min(i + LOTE, aInserir.length)}/${aInserir.length}`);
     }
+
+    const comCodigo = await prisma.itemCatalogo.findMany({
+      where: { codigo: { not: null } },
+      select: { id: true, codigo: true },
+    });
+    for (const it of comCodigo) if (it.codigo) catalogoPorCodigo.set(it.codigo, it.id);
     console.log(`  ${nCat} itens com código + ${nPend} itens a cadastrar`);
   }
 
