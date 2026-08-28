@@ -80,22 +80,46 @@ export function RequisicaoForm({
   const [obraId, setObraId] = useState(
     inicial?.obraId ?? obrasProp[0]?.id ?? "",
   );
+  const [obrasCarregando, setObrasCarregando] = useState(obrasProp.length === 0);
   const [obs, setObs] = useState(inicial?.observacaoGeral ?? "");
   const [itens, setItens] = useState<ItemForm[]>(inicial?.itens ?? []);
   const [erro, setErro] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  // Se a página veio do cache offline sem obras, tenta a lista baixada.
+  // Carrega as obras de forma resiliente: cópia local (offline) + API (online).
   useEffect(() => {
-    if (obras.length > 0) return;
-    import("@/lib/offline/sync").then(async ({ obterObrasLocais }) => {
-      const locais = await obterObrasLocais();
-      if (locais.length) {
+    if (obrasProp.length > 0) return;
+    let vivo = true;
+    (async () => {
+      const { obterObrasLocais } = await import("@/lib/offline/sync");
+      const { setMeta } = await import("@/lib/offline/db");
+      const locais = await obterObrasLocais().catch(() => []);
+      if (vivo && locais.length) {
         setObras(locais);
         setObraId((atual) => atual || locais[0].id);
+        setObrasCarregando(false);
       }
-    });
-  }, [obras.length]);
+      if (navigator.onLine) {
+        try {
+          const r = await fetch("/api/obras", { cache: "no-store" });
+          if (r.ok) {
+            const j = (await r.json()) as { obras: ObraOpt[] };
+            if (vivo && j.obras?.length) {
+              setObras(j.obras);
+              setObraId((atual) => atual || j.obras[0].id);
+              await setMeta("obras", j.obras).catch(() => {});
+            }
+          }
+        } catch {
+          /* offline — segue com a cópia local */
+        }
+      }
+      if (vivo) setObrasCarregando(false);
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, [obrasProp.length]);
 
   function addDoCatalogo(c: CatalogoItem) {
     setItens((xs) => [
@@ -162,8 +186,16 @@ export function RequisicaoForm({
         obraNome,
       );
       await atualizarPendentes();
-      if (enviar && navigator.onLine) await sincronizarAgora();
-      router.push("/rascunhos");
+      if (enviar && navigator.onLine) {
+        const r = await sincronizarAgora();
+        // Enviou com sucesso estando online → volta para a lista principal.
+        if (r && r.erros === 0 && navigator.onLine) {
+          router.push("/");
+          router.refresh();
+          return motivo;
+        }
+      }
+      router.push("/offline?ficar=1");
       router.refresh();
       return motivo;
     }
@@ -213,13 +245,22 @@ export function RequisicaoForm({
               value={obraId}
               onChange={(e) => setObraId(e.target.value)}
             >
-              {obras.length === 0 && <option value="">Nenhuma obra cadastrada</option>}
+              {obras.length === 0 && (
+                <option value="">
+                  {obrasCarregando ? "Carregando obras..." : "Nenhuma obra disponível"}
+                </option>
+              )}
               {obras.map((o) => (
                 <option key={o.id} value={o.id}>
                   {o.nome}
                 </option>
               ))}
             </select>
+            {obras.length === 0 && !obrasCarregando && (
+              <p className="mt-1 text-xs text-amber-600">
+                Abra o app com internet ao menos uma vez para baixar a lista de obras.
+              </p>
+            )}
           </div>
         </div>
         <div>

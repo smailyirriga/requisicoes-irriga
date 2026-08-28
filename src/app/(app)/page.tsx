@@ -4,6 +4,7 @@ import { usuarioAtual } from "@/lib/auth";
 import { STATUS, STATUS_LABEL, type Status } from "@/lib/constantes";
 import { StatusBadge } from "@/components/status-badge";
 import { RascunhosWidget } from "@/components/offline/rascunhos-widget";
+import { LinkRequisicao } from "@/components/offline/link-requisicao";
 import { dataBR, numReq } from "@/lib/formato";
 import type { Prisma } from "@prisma/client";
 
@@ -126,9 +127,9 @@ export default async function Dashboard({
           </p>
         )}
         {requisicoes.map((r) => (
-          <Link
+          <LinkRequisicao
             key={r.id}
-            href={`/requisicoes/${r.id}`}
+            id={r.id}
             className="flex items-center gap-3 p-3 hover:bg-slate-50"
           >
             <div className="w-14 shrink-0 text-center">
@@ -145,7 +146,7 @@ export default async function Dashboard({
               </div>
             </div>
             <StatusBadge status={r.status} />
-          </Link>
+          </LinkRequisicao>
         ))}
       </div>
     </div>

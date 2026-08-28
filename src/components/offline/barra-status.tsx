@@ -32,7 +32,7 @@ export function BarraStatusOffline() {
           {!online ? "● Offline" : sincronizando ? "↻ Sincronizando…" : "● Online"}
         </span>
         {pendentes > 0 && (
-          <Link href="/rascunhos" className="underline">
+          <Link href="/offline?ficar=1" className="underline">
             {pendentes} {pendentes === 1 ? "requisição" : "requisições"} não enviada
             {pendentes === 1 ? "" : "s"}
             {comErro > 0 ? ` (${comErro} com erro)` : ""}

@@ -18,7 +18,7 @@ export function RascunhosWidget() {
 
   return (
     <Link
-      href="/rascunhos"
+      href="/offline?ficar=1"
       className="card block border-amber-200 bg-amber-50 p-3 hover:bg-amber-100"
     >
       <p className="text-sm font-semibold text-amber-900">

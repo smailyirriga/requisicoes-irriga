@@ -5,7 +5,9 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Requisições de Compra — IRRIGA",
     short_name: "Requisições",
     description: "App de requisições de compra da IRRIGA ENGENHARIA",
-    start_url: "/",
+    // Abre por uma tela leve e sem login que funciona offline; ela redireciona
+    // para o app normal quando há internet.
+    start_url: "/offline",
     display: "standalone",
     background_color: "#f4f5f7",
     theme_color: "#0369a1",

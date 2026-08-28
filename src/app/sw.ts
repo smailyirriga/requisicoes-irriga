@@ -1,6 +1,11 @@
-import { defaultCache } from "@serwist/next/worker";
 import type { PrecacheEntry, SerwistGlobalConfig } from "serwist";
-import { NetworkFirst, Serwist } from "serwist";
+import {
+  CacheFirst,
+  ExpirationPlugin,
+  NetworkFirst,
+  Serwist,
+  StaleWhileRevalidate,
+} from "serwist";
 
 declare global {
   interface WorkerGlobalScope extends SerwistGlobalConfig {
@@ -14,32 +19,67 @@ const serwist = new Serwist({
   precacheEntries: self.__SW_MANIFEST,
   skipWaiting: true,
   clientsClaim: true,
-  navigationPreload: true,
+  navigationPreload: false,
   runtimeCaching: [
-    // snapshot para uso offline (catálogo + requisições recentes)
+    // Assets versionados do Next — imutáveis
     {
-      matcher: ({ url }) => url.pathname === "/api/offline/bootstrap",
-      handler: new NetworkFirst({
-        cacheName: "offline-bootstrap",
-        networkTimeoutSeconds: 12,
+      matcher: ({ url }) => url.pathname.startsWith("/_next/static/"),
+      handler: new CacheFirst({
+        cacheName: "next-static",
+        plugins: [new ExpirationPlugin({ maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 30 })],
       }),
     },
-    // páginas: tenta a rede, cai para o cache quando offline
+    // Dados para uso offline (catálogo, obras, requisições)
     {
-      matcher: ({ request, url }) =>
-        request.mode === "navigate" && !url.pathname.startsWith("/api"),
+      matcher: ({ url }) =>
+        url.pathname.startsWith("/api/offline") ||
+        url.pathname === "/api/obras" ||
+        url.pathname === "/api/catalogo",
+      handler: new NetworkFirst({
+        cacheName: "dados-offline",
+        networkTimeoutSeconds: 20,
+        plugins: [new ExpirationPlugin({ maxEntries: 32, maxAgeSeconds: 60 * 60 * 24 * 7 })],
+      }),
+    },
+    // Payloads RSC (navegação client-side do Next)
+    {
+      matcher: ({ url, request }) =>
+        request.headers.get("RSC") === "1" || url.search.includes("_rsc="),
+      handler: new NetworkFirst({
+        cacheName: "rsc",
+        networkTimeoutSeconds: 5,
+        plugins: [new ExpirationPlugin({ maxEntries: 64, maxAgeSeconds: 60 * 60 * 24 * 14 })],
+      }),
+    },
+    // Navegações (HTML): rede primeiro, cache como reserva
+    {
+      matcher: ({ request }) => request.mode === "navigate",
       handler: new NetworkFirst({
         cacheName: "paginas",
-        networkTimeoutSeconds: 5,
+        networkTimeoutSeconds: 4,
+        plugins: [new ExpirationPlugin({ maxEntries: 64, maxAgeSeconds: 60 * 60 * 24 * 14 })],
       }),
     },
-    ...defaultCache,
+    // CSS / JS / workers
+    {
+      matcher: ({ request }) =>
+        ["style", "script", "worker"].includes(request.destination),
+      handler: new StaleWhileRevalidate({ cacheName: "assets" }),
+    },
+    // Imagens
+    {
+      matcher: ({ request }) => request.destination === "image",
+      handler: new CacheFirst({
+        cacheName: "imagens",
+        plugins: [new ExpirationPlugin({ maxEntries: 64, maxAgeSeconds: 60 * 60 * 24 * 30 })],
+      }),
+    },
   ],
   fallbacks: {
     entries: [
       {
         url: "/offline",
-        matcher: ({ request }) => request.destination === "document",
+        matcher: ({ request }) => request.mode === "navigate",
       },
     ],
   },

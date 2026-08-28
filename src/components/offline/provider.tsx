@@ -72,14 +72,12 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
     atualizarPendentes();
     void sincronizarAgora();
 
-    // prepara as telas essenciais para funcionarem offline
+    // mantém o hub offline quentinho no cache
     if (navigator.onLine) {
-      for (const rota of ["/requisicoes/nova", "/rascunhos", "/offline"]) {
-        try {
-          router.prefetch(rota);
-        } catch {
-          /* ignore */
-        }
+      try {
+        router.prefetch("/offline");
+      } catch {
+        /* ignore */
       }
     }
 

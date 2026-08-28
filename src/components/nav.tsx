@@ -5,13 +5,13 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { sair } from "@/actions/sessao";
 import { PAPEL_LABEL, type Papel } from "@/lib/constantes";
+import { useOffline } from "@/components/offline/provider";
 
-type Item = { href: string; label: string; papeis?: Papel[] };
+type Item = { href: string; hrefOffline?: string; label: string; papeis?: Papel[] };
 
 const ITENS: Item[] = [
-  { href: "/", label: "Requisições" },
-  { href: "/requisicoes/nova", label: "Nova requisição" },
-  { href: "/rascunhos", label: "Rascunhos" },
+  { href: "/", hrefOffline: "/offline?ficar=1", label: "Requisições" },
+  { href: "/requisicoes/nova", hrefOffline: "/offline?novo=1", label: "Nova requisição" },
   { href: "/catalogo", label: "Catálogo" },
   { href: "/obras", label: "Obras", papeis: ["ADMIN"] },
   { href: "/usuarios", label: "Usuários", papeis: ["ADMIN"] },
@@ -20,9 +20,13 @@ const ITENS: Item[] = [
 
 export function Nav({ nome, papel }: { nome: string; papel: Papel }) {
   const pathname = usePathname();
+  const { online } = useOffline();
   const [aberto, setAberto] = useState(false);
 
-  const itens = ITENS.filter((i) => !i.papeis || i.papeis.includes(papel));
+  const itens = ITENS.filter((i) => !i.papeis || i.papeis.includes(papel)).map((i) => ({
+    ...i,
+    href: !online && i.hrefOffline ? i.hrefOffline : i.href,
+  }));
 
   const linkCls = (href: string) => {
     const ativo = href === "/" ? pathname === "/" : pathname.startsWith(href);
