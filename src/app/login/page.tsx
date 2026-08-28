@@ -12,9 +12,12 @@ export default function LoginPage() {
     <main className="flex min-h-screen items-center justify-center p-4">
       <div className="card w-full max-w-sm p-6">
         <div className="mb-6 text-center">
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-sky-700 text-lg font-bold text-white">
-            IE
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/icons/icon-192.png"
+            alt="IRRIGA ENGENHARIA"
+            className="mx-auto mb-3 h-14 w-14 rounded-xl"
+          />
           <h1 className="text-lg font-semibold text-slate-800">Requisições de Compra</h1>
           <p className="text-sm text-slate-500">IRRIGA ENGENHARIA</p>
         </div>

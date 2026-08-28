@@ -39,9 +39,12 @@ export function Nav({ nome, papel }: { nome: string; papel: Papel }) {
     <header className="sticky top-0 z-20 border-b border-slate-200 bg-white">
       <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-2.5">
         <Link href="/" className="flex items-center gap-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-700 text-sm font-bold text-white">
-            IE
-          </span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/icons/icon-192.png"
+            alt="IRRIGA"
+            className="h-8 w-8 rounded-lg"
+          />
           <span className="hidden text-sm font-semibold text-slate-800 sm:block">
             Requisições
           </span>
