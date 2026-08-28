@@ -13,42 +13,45 @@ if (!fs.existsSync(origem)) {
 const dir = path.join(RAIZ, "public", "icons");
 fs.mkdirSync(dir, { recursive: true });
 
-// Ícone "any": logo preenchendo o quadrado, fundo branco (iOS não gosta de transparência)
+// Remove qualquer borda/transparência ao redor do desenho.
+async function logoRecortada() {
+  return sharp(origem).trim({ threshold: 10 }).png().toBuffer();
+}
+
+// Ícone "any": desenho preenchendo TODO o quadrado (full-bleed).
 async function iconeAny(size) {
-  const base = sharp(origem).resize(size, size, {
-    fit: "cover",
-    position: "center",
-  });
-  await sharp({
-    create: { width: size, height: size, channels: 4, background: "#ffffff" },
-  })
-    .composite([{ input: await base.png().toBuffer() }])
+  const recortada = await logoRecortada();
+  await sharp(recortada)
+    .resize(size, size, { fit: "cover", position: "center" })
+    .flatten({ background: "#ffffff" })
     .png()
     .toFile(path.join(dir, `icon-${size}.png`));
   console.log("gerado icon-" + size + ".png");
 }
 
-// Ícone "maskable": logo menor, centralizado, com margem de segurança
+// Ícone "maskable": mesma arte, leve margem para a zona de segurança do Android.
 async function iconeMaskable(size) {
-  const inner = Math.round(size * 0.72);
-  const logo = await sharp(origem)
-    .resize(inner, inner, { fit: "contain", background: "#ffffff" })
+  const recortada = await logoRecortada();
+  const inner = Math.round(size * 0.86);
+  const arte = await sharp(recortada)
+    .resize(inner, inner, { fit: "cover", position: "center" })
     .png()
     .toBuffer();
   const off = Math.round((size - inner) / 2);
   await sharp({
     create: { width: size, height: size, channels: 4, background: "#ffffff" },
   })
-    .composite([{ input: logo, top: off, left: off }])
+    .composite([{ input: arte, top: off, left: off }])
     .png()
     .toFile(path.join(dir, `icon-maskable-${size}.png`));
   console.log("gerado icon-maskable-" + size + ".png");
 }
 
-// favicon
 async function favicon() {
-  await sharp(origem)
-    .resize(48, 48, { fit: "cover" })
+  const recortada = await logoRecortada();
+  await sharp(recortada)
+    .resize(64, 64, { fit: "cover" })
+    .flatten({ background: "#ffffff" })
     .png()
     .toFile(path.join(RAIZ, "src", "app", "icon.png"));
   console.log("gerado src/app/icon.png (favicon)");
